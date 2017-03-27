@@ -1,0 +1,8 @@
+dwi2fod: uncompressing image "/om/user/ksitek/exvivo/data/Reg_S64550_nii_b0-slice_mask.nii.gz"...  [===========================]
+dwi2fod: [ERROR] unknown format for image "/om/user/ksitek/exvivo/mrtrix/fod_out" (no file extension specified)
+dwi2fod: [ERROR] error creating image "/om/user/ksitek/exvivo/mrtrix/fod_out"
+tckgen: [INFO] opening image "/om/user/ksitek/exvivo/data/Reg_S64550_nii_b0-slice_mask.nii.gz"...
+tckgen: uncompressing image "/om/user/ksitek/exvivo/data/Reg_S64550_nii_b0-slice_mask.nii.gz"...  [===========================]
+tckgen: [INFO] opening image "/om/user/ksitek/exvivo/mrtrix/fod_out"...
+tckgen: [ERROR] unknown format for image "/om/user/ksitek/exvivo/mrtrix/fod_out"
+tckgen: [ERROR] error opening image "/om/user/ksitek/exvivo/mrtrix/fod_out"

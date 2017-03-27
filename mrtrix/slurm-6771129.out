@@ -1,0 +1,42 @@
+dwi2fod: uncompressing image "/om/user/ksitek/exvivo/data/Reg_S64550_nii_b0-slice_mask.nii.gz"...  [===========================]
+dwi2fod: preloading data for "/om/user/ksitek/exvivo/mrtrix/dwi.mif"...  [==================================================]
+dwi2fod: performing constrained spherical deconvolution...  [==================================================]
+tckgen: [INFO] opening image "/om/user/ksitek/exvivo/data/Reg_S64550_nii_b0-slice_mask.nii.gz"...
+tckgen: uncompressing image "/om/user/ksitek/exvivo/data/Reg_S64550_nii_b0-slice_mask.nii.gz"...  [===========================]
+tckgen: [INFO] opening image "/om/user/ksitek/exvivo/mrtrix/fod_out.nii"...
+tckgen: preloading data for "/om/user/ksitek/exvivo/mrtrix/fod_out.nii"...  [==================================================]
+tckgen: [INFO] step size = 0.099999994 mm
+tckgen: [INFO] maximum deviation angle = 45 deg
+tckgen: [INFO] minimum radius of curvature = 0.19999998251356449 mm
+tckgen: [INFO] iFOD2 internal step size = 0.0333333313 mm
+tckgen: [INFO] rejection sampling will use 7 directions with a ratio of 2.15373945 (predicted number of samples per step = 12.9595909)
+tckgen: [  0%]        1 generated,        1 selected
+tckgen: [  0%]       11 generated,       11 selected
+tckgen: [  0%]       51 generated,       48 selected
+tckgen: [  0%]      131 generated,      126 selected
+tckgen: [  0%]      351 generated,      337 selected
+tckgen: [  0%]      691 generated,      666 selected
+tckgen: [  0%]     1371 generated,     1323 selected
+tckgen: [  0%]     2501 generated,     2417 selected
+tckgen: [  0%]     5061 generated,     4904 selected
+tckgen: [  0%]     9951 generated,     9637 selected
+tckgen: [  1%]    19631 generated,    18990 selected
+tckgen: [  3%]    38951 generated,    37705 selected
+tckgen: [  7%]    77791 generated,    75242 selected
+tckgen: [ 14%]   154491 generated,   149433 selected
+tckgen: [ 29%]   309051 generated,   298931 selected
+tckgen: [ 59%]   616351 generated,   596159 selected
+tckgen: [100%]  1033938 generated,  1000000 selected
+tckgen: [INFO] mean number of samples per step = -nan
+tckgen: [INFO] mean number of steps between rejection sampling truncations = -nan
+tckgen: [INFO] maximum truncation error = 1.2126864194869995
+tckgen: [INFO] Total number of track terminations: 2068830
+tckgen: [INFO] Termination reason probabilities:
+tckgen: [INFO]   Calibrator failed: 77.871453913564679%
+tckgen: [INFO]   Exited image: 0%
+tckgen: [INFO]   Bad diffusion signal: 0.0059453894230072071%
+tckgen: [INFO]   Excessive curvature: 0%
+tckgen: [INFO]   Max length exceeded: 22.12260069701232%
+tckgen: [INFO] Track rejection counts:
+tckgen: [INFO]   No propagation from seed: 1596
+tckgen: [INFO]   Shorter than minimum length: 32363
