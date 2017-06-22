@@ -1,6 +1,3 @@
-import os
-from glob import glob
-
 from nipype import config
 config.enable_provenance()
 
@@ -17,7 +14,7 @@ sids = ['Reg_S64550']
 if not os.path.exists(out_dir):
     os.mkdir(out_dir)
 
-work_dir = os.path.abspath('/om/scratch/Wed/ksitek/dipy_csd')
+work_dir = os.path.abspath('/om/scratch/Fri/ksitek/dipy_csd')
 
 def dmri_recon(sid, data_dir, out_dir, recon='csd', num_threads=1):
     import tempfile
@@ -37,11 +34,14 @@ def dmri_recon(sid, data_dir, out_dir, recon='csd', num_threads=1):
     from glob import glob
 
 
-    fimg = os.path.abspath(glob(os.path.join(data_dir, 'Reg_S64550_nii4d.nii.gz'))[0])
+    fimg = os.path.abspath(glob(os.path.join(data_dir,
+                                             'Reg_S64550_nii4d.nii.gz'))[0])
     print "dwi file = %s"%fimg
-    fbvec = os.path.abspath(glob(os.path.join(data_dir, 'camino_120_RAS.bvecs'))[0])
+    fbvec = os.path.abspath(glob(os.path.join(data_dir,
+                                              'camino_120_RAS.bvecs'))[0])
     print "bvec file = %s"%fbvec
-    fbval = os.path.abspath(glob(os.path.join(data_dir, 'camino_120_RAS.bvals'))[0])
+    fbval = os.path.abspath(glob(os.path.join(data_dir,
+                                              'camino_120_RAS.bvals'))[0])
     print "bval file = %s"%fbval
     img = nib.load(fimg)
     data = img.get_data()
@@ -151,7 +151,8 @@ def dmri_recon(sid, data_dir, out_dir, recon='csd', num_threads=1):
 
     #from dipy.reconst.dti import quantize_evecs
     #peak_indices = quantize_evecs(tenfit.evecs, sphere.vertices)
-    #eu = EuDX(FA, peak_indices, odf_vertices = sphere.vertices, a_low=0.2, seeds=10**6, ang_thr=35)
+    #eu = EuDX(FA, peak_indices, odf_vertices = sphere.vertices,
+               #a_low=0.2, seeds=10**6, ang_thr=35)
 
     fa_img = nib.Nifti1Image(peaks.gfa, img.get_affine())
     model_gfa_file = os.path.abspath('%s_%s_gfa.nii.gz' % (prefix, recon))
@@ -160,10 +161,12 @@ def dmri_recon(sid, data_dir, out_dir, recon='csd', num_threads=1):
     from dipy.tracking.eudx import EuDX
     print "reconstructing with EuDX"
     if useFA:
-        eu = EuDX(FA, peaks.peak_indices[..., 0], odf_vertices = sphere.vertices,
+        eu = EuDX(FA, peaks.peak_indices[..., 0],
+                  odf_vertices = sphere.vertices,
                   a_low=0.1, seeds=10**6, ang_thr=35)
     else:
-        eu = EuDX(peaks.gfa, peaks.peak_indices[..., 0], odf_vertices = sphere.vertices,
+        eu = EuDX(peaks.gfa, peaks.peak_indices[..., 0],
+                  odf_vertices = sphere.vertices,
                   a_low=0.1, seeds=10**6, ang_thr=35)
 
     #import dipy.tracking.metrics as dmetrics
@@ -190,8 +193,10 @@ def dmri_recon(sid, data_dir, out_dir, recon='csd', num_threads=1):
 infosource = Node(IdentityInterface(fields=['subject_id']), name='infosource')
 infosource.iterables = ('subject_id', sids)
 
-tracker = Node(Function(input_names=['sid', 'data_dir', 'out_dir', 'recon', 'num_threads'],
-                        output_names=['tensor_fa_file', 'tensor_evec_file', 'model_gfa_file',
+tracker = Node(Function(input_names=['sid', 'data_dir', 'out_dir',
+                                     'recon', 'num_threads'],
+                        output_names=['tensor_fa_file', 'tensor_evec_file',
+                                      'model_gfa_file',
                                       'model_track_file'],
                         function=dmri_recon), name='tracker')
 tracker.inputs.data_dir = data_dir
@@ -199,7 +204,7 @@ tracker.inputs.out_dir = out_dir
 tracker.inputs.recon = 'csd'
 num_threads = 2 # 20
 tracker.inputs.num_threads = num_threads
-tracker.plugin_args = {'sbatch_args': '--mem=%dG -N 1 -c %d --qos=gablab' % (20 * num_threads, num_threads),
+tracker.plugin_args = {'sbatch_args': '--time=6:00:00 --mem=%dG -N 1 -c %d --qos=gablab' % (20 * num_threads, num_threads),
                        'overwrite': True}
 
 ds = Node(DataSink(parameterization=False), name='sinker')
@@ -218,4 +223,5 @@ wf.connect(tracker, 'model_track_file', ds, 'recon.@track')
 
 wf.base_dir = work_dir
 
-wf.run(plugin='SLURM', plugin_args={'sbatch_args': '--mem=10G -N1 -c2 --qos=gablab'})
+wf.run(plugin='SLURM',
+       plugin_args={'sbatch_args': '--time=23:59:59 --mem=10G -N1 -c2 --qos=gablab'})
