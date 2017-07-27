@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# per https://www.jiscmail.ac.uk/cgi-bin/webadmin?A2=fsl;32d186a0.0812
+
 #SBATCH --mem=20G
 #SBATCH --time=1:00:00
 #SBATCH --qos=gablab
