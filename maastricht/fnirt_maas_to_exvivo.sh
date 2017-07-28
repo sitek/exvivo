@@ -10,6 +10,6 @@ fnirt --ref=/om/user/ksitek/exvivo/data/Reg_S64550_nii_b0-slice_fslreorient2std.
       --refmask=/om/user/ksitek/exvivo/data/Reg_S64550_nii_b0-slice_mask.nii.gz \
       --warpres=2,2,2 \
       --interp=spline \
-      --cout=om/user/ksitek/exvivo/maastricht/maas2exvivo_warp2-spline_coef \
+      --cout=/om/user/ksitek/exvivo/maastricht/maas2exvivo_warp2-spline_coef \
       --iout=/om/user/ksitek/exvivo/maastricht/maas2exvivo_fnirt_warp2-spline.nii.gz \
       --fout=/om/user/ksitek/exvivo/maastricht/maas2exvivo_fnirt_warpfield_warp2-spline
