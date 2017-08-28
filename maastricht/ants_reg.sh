@@ -9,7 +9,7 @@
 
 fixed_img=/om/user/ksitek/exvivo/data/Reg_S64550_nii_b0-slice_fslreorient2std.nii.gz
 moving_img=/om/user/ksitek/maastricht/brainstem/fnirt_anat_siT1w_fslreorient2std.2.nii.gz
-out_template=/om/user/ksitek/exvivo/maastricht/maas2exvivo_ants_
+out_template=/om/user/ksitek/exvivo/maastricht/ants/maas2exvivo_ants_
 
 antsRegistration --dimensionality 3 --float 0 \
         --output [$out_template, ${out_template}Warped.nii.gz] \
