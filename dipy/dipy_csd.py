@@ -1,22 +1,24 @@
-from nipype import config
-config.enable_provenance()
-
+#from nipype import config
+#config.enable_provenance()
+#
 from nipype import Node, Function, Workflow, IdentityInterface
 from nipype.interfaces.io import SelectFiles, DataSink
 
 import os
 from glob import glob
 
+resamp = '0.6mm'
+
 data_dir = '/om/user/ksitek/exvivo/data'
-out_dir = '/om/user/ksitek/exvivo/analysis/dipy_csd'
+out_dir = '/om/user/ksitek/exvivo/analysis/dipy_csd/%s_fa_thresh_0.3_ang_thresh_45/'%resamp
 sids = ['Reg_S64550']
 
 if not os.path.exists(out_dir):
     os.mkdir(out_dir)
 
-work_dir = os.path.abspath('/om/scratch/Fri/ksitek/dipy_csd')
+work_dir = os.path.abspath('/om/scratch/Thu/ksitek/dipy_csd/%s'%resamp)
 
-def dmri_recon(sid, data_dir, out_dir, recon='csd', num_threads=1):
+def dmri_recon(sid, data_dir, out_dir, resamp, recon='csd', num_threads=1, target=None):
     import tempfile
     #tempfile.tempdir = '/om/scratch/Fri/ksitek/'
 
@@ -34,13 +36,13 @@ def dmri_recon(sid, data_dir, out_dir, recon='csd', num_threads=1):
     from glob import glob
 
 
-    fimg = os.path.abspath(glob(os.path.join(data_dir,
-                                             'Reg_S64550_nii4d.nii.gz'))[0])
+    fimg = os.path.abspath(glob(os.path.join(data_dir, 'resample',
+                                             'Reg_S64550_nii4d_resamp-%s.nii.gz'%(resamp)))[0])
     print "dwi file = %s"%fimg
-    fbvec = os.path.abspath(glob(os.path.join(data_dir,
-                                              'camino_120_RAS.bvecs'))[0])
+    fbvec = os.path.abspath(glob(os.path.join(data_dir, 'bvecs',
+                                              'camino_120_RAS_flipped-xy.bvecs'))[0])
     print "bvec file = %s"%fbvec
-    fbval = os.path.abspath(glob(os.path.join(data_dir,
+    fbval = os.path.abspath(glob(os.path.join(data_dir, 'bvecs',
                                               'camino_120_RAS.bvals'))[0])
     print "bval file = %s"%fbval
     img = nib.load(fimg)
@@ -82,7 +84,7 @@ def dmri_recon(sid, data_dir, out_dir, recon='csd', num_threads=1):
 
 
     from dipy.reconst.csdeconv import auto_response
-    response, ratio = auto_response(gtab, data, roi_radius=10, fa_thr=0.7)
+    response, ratio = auto_response(gtab, data, roi_radius=10, fa_thr=0.3) # 0.7
     print "response:"
     print response
     print "ratio:"
@@ -91,7 +93,7 @@ def dmri_recon(sid, data_dir, out_dir, recon='csd', num_threads=1):
     #from dipy.segment.mask import median_otsu
     #b0_mask, mask = median_otsu(data[:, :, :, b0idx].mean(axis=3).squeeze(), 4, 4)
 
-    fmask1 = os.path.join(data_dir, 'Reg_S64550_nii_b0-slice_mask.nii.gz')
+    fmask1 = os.path.join(data_dir, 'resample','Reg_S64550_nii_b0-slice_mask_resamp-%s.nii.gz'%(resamp))
     print "fmask file = %s"%fmask1
     mask = nib.load(fmask1).get_data()
 
@@ -163,11 +165,15 @@ def dmri_recon(sid, data_dir, out_dir, recon='csd', num_threads=1):
     if useFA:
         eu = EuDX(FA, peaks.peak_indices[..., 0],
                   odf_vertices = sphere.vertices,
-                  a_low=0.1, seeds=10**6, ang_thr=35)
+                  #a_low=0.1,
+                  seeds=10**6,
+                  ang_thr=45)
     else:
         eu = EuDX(peaks.gfa, peaks.peak_indices[..., 0],
                   odf_vertices = sphere.vertices,
-                  a_low=0.1, seeds=10**6, ang_thr=35)
+                  #a_low=0.1,
+                  seeds=10**6,
+                  ang_thr=45)
 
     #import dipy.tracking.metrics as dmetrics
     streamlines = ((sl, None, None) for sl in eu) # if dmetrics.length(sl) > 15)
@@ -193,7 +199,7 @@ def dmri_recon(sid, data_dir, out_dir, recon='csd', num_threads=1):
 infosource = Node(IdentityInterface(fields=['subject_id']), name='infosource')
 infosource.iterables = ('subject_id', sids)
 
-tracker = Node(Function(input_names=['sid', 'data_dir', 'out_dir',
+tracker = Node(Function(input_names=['sid', 'data_dir', 'out_dir', 'resamp',
                                      'recon', 'num_threads'],
                         output_names=['tensor_fa_file', 'tensor_evec_file',
                                       'model_gfa_file',
@@ -201,10 +207,11 @@ tracker = Node(Function(input_names=['sid', 'data_dir', 'out_dir',
                         function=dmri_recon), name='tracker')
 tracker.inputs.data_dir = data_dir
 tracker.inputs.out_dir = out_dir
+tracker.inputs.resamp = resamp
 tracker.inputs.recon = 'csd'
-num_threads = 2 # 20
+num_threads =  10
 tracker.inputs.num_threads = num_threads
-tracker.plugin_args = {'sbatch_args': '--time=6:00:00 --mem=%dG -N 1 -c %d --qos=gablab' % (20 * num_threads, num_threads),
+tracker.plugin_args = {'sbatch_args': '--qos=gablab --time=2-00:00:00 --mem=%dG -N 1 -c %d' % (20 * num_threads, num_threads),
                        'overwrite': True}
 
 ds = Node(DataSink(parameterization=False), name='sinker')
@@ -224,4 +231,4 @@ wf.connect(tracker, 'model_track_file', ds, 'recon.@track')
 wf.base_dir = work_dir
 
 wf.run(plugin='SLURM',
-       plugin_args={'sbatch_args': '--time=23:59:59 --mem=10G -N1 -c2 --qos=gablab'})
+       plugin_args={'sbatch_args': '--time=3-00:00:00 --mem=80G -N1 -c2 --qos=gablab'})
