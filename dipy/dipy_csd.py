@@ -7,7 +7,7 @@ from nipype.interfaces.io import SelectFiles, DataSink
 import os
 from glob import glob
 
-resolution = '0.6mm'
+resolution = '0.8mm'
 
 data_dir = '/om/user/ksitek/exvivo/data'
 out_dir = '/om/user/ksitek/exvivo/analysis/dipy_csd/%s_fa_thresh_0.3_ang_thresh_45/'%resolution
@@ -102,7 +102,12 @@ def dmri_recon(sid, data_dir, out_dir, resolution, recon='csd', num_threads=1):
     #from dipy.segment.mask import median_otsu
     #b0_mask, mask = median_otsu(data[:, :, :, b0idx].mean(axis=3).squeeze(), 4, 4)
 
-    fmask1 = os.path.join(data_dir, 'resample','Reg_S64550_nii_b0-slice_mask_resamp-%s.nii.gz'%(resolution))
+    if resolution = '0.2mm':
+        mask_name = 'Reg_S64550_nii_b0-slice_mask.nii.gz'
+        fmask1 = os.path.join(data_dir, mask_name)
+    else:
+        mask_name = 'Reg_S64550_nii_b0-slice_mask_resamp-%s.nii.gz'%(resolution)
+        fmask1 = os.path.join(data_dir, 'resample', mask_name)
     print "fmask file = %s"%fmask1
     mask = nib.load(fmask1).get_data()
 
