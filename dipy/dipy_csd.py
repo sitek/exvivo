@@ -7,18 +7,23 @@ from nipype.interfaces.io import SelectFiles, DataSink
 import os
 from glob import glob
 
-resamp = '0.6mm'
+resolution = '0.6mm'
 
 data_dir = '/om/user/ksitek/exvivo/data'
-out_dir = '/om/user/ksitek/exvivo/analysis/dipy_csd/%s_fa_thresh_0.3_ang_thresh_45/'%resamp
+out_dir = '/om/user/ksitek/exvivo/analysis/dipy_csd/%s_fa_thresh_0.3_ang_thresh_45/'%resolution
 sids = ['Reg_S64550']
 
 if not os.path.exists(out_dir):
     os.mkdir(out_dir)
 
-work_dir = os.path.abspath('/om/scratch/Thu/ksitek/dipy_csd/%s'%resamp)
+work_dir = os.path.abspath('/om/scratch/Thu/ksitek/dipy_csd/%s'%resolution)
 
-def dmri_recon(sid, data_dir, out_dir, resamp, recon='csd', num_threads=1, target=None):
+# if you want to run tractography from specific regions of interest
+atlas_file = os.path.join('/om/user/ksitek/exvivo/maastricht/',
+                          'atlas/maas-atlas2exvivo_ants_Linear.nii.gz')
+atlas_labels = [x+1 for x in range(8)] # labels 1-8
+
+def dmri_recon(sid, data_dir, out_dir, resolution, recon='csd', num_threads=1):
     import tempfile
     #tempfile.tempdir = '/om/scratch/Fri/ksitek/'
 
@@ -35,9 +40,11 @@ def dmri_recon(sid, data_dir, out_dir, resamp, recon='csd', num_threads=1, targe
     import numpy as np
     from glob import glob
 
-
-    fimg = os.path.abspath(glob(os.path.join(data_dir, 'resample',
-                                             'Reg_S64550_nii4d_resamp-%s.nii.gz'%(resamp)))[0])
+    if resolution = '0.2mm':
+        filename = 'Reg_S64550_nii4d.nii.gz'
+    else:
+        filename = 'Reg_S64550_nii4d_resamp-%s.nii.gz'%(resolution)
+    fimg = os.path.abspath(glob(os.path.join(data_dir, 'resample', filename))[0])
     print "dwi file = %s"%fimg
     fbvec = os.path.abspath(glob(os.path.join(data_dir, 'bvecs',
                                               'camino_120_RAS_flipped-xy.bvecs'))[0])
@@ -47,6 +54,8 @@ def dmri_recon(sid, data_dir, out_dir, resamp, recon='csd', num_threads=1, targe
     print "bval file = %s"%fbval
     img = nib.load(fimg)
     data = img.get_data()
+
+    affine = img.get_affine()
 
     prefix = sid
 
@@ -93,7 +102,7 @@ def dmri_recon(sid, data_dir, out_dir, resamp, recon='csd', num_threads=1, targe
     #from dipy.segment.mask import median_otsu
     #b0_mask, mask = median_otsu(data[:, :, :, b0idx].mean(axis=3).squeeze(), 4, 4)
 
-    fmask1 = os.path.join(data_dir, 'resample','Reg_S64550_nii_b0-slice_mask_resamp-%s.nii.gz'%(resamp))
+    fmask1 = os.path.join(data_dir, 'resample','Reg_S64550_nii_b0-slice_mask_resamp-%s.nii.gz'%(resolution))
     print "fmask file = %s"%fmask1
     mask = nib.load(fmask1).get_data()
 
@@ -194,20 +203,56 @@ def dmri_recon(sid, data_dir, out_dir, resamp, recon='csd', num_threads=1, targe
         os.environ['OMP_NUM_THREADS'] = ompoldval
     else:
         del os.environ['OMP_NUM_THREADS']
-    return tensor_fa_file, tensor_evec_file, model_gfa_file, sl_fname
+    return tensor_fa_file, tensor_evec_file, model_gfa_file, sl_fname, affine
 
-infosource = Node(IdentityInterface(fields=['subject_id']), name='infosource')
+# extract targets from an atlas file
+# see nilearn example 8.5.4. Regions Extraction of Default Mode Networks using Smith Atlas
+def extract_region(atlas_file, label):
+    from nipype.interfaces.base import CommandLine
+    from nipype.pipeline.engine import Node
+    node = Node(CommandLine('fslmaths %s -thr %s -uthr %s region_%s.nii.gz'%(atlas_file, label, label, label)),
+                name = 'extract_roi')
+    node.base_dir = os.getcwd()
+    node.run()
+
+    return single_region
+
+region_extracter = Node(Function(input_names = ['atlas_file','label'],
+                                 output_names = ['single_region'],
+                                 function = extract_region,
+                                 name = 'region_extracter'))
+
+# filter streamlines by region of interest
+def sl_filter(streamlines, target_mask, affine, include=True):
+    from dipy.tracking.utils import target
+
+    target(streamlines, target_mask, affine, include=True)
+
+    return target_streamlines
+
+filter_streamlines = Node(Function(input_names = ['streamlines', 'target_mask',
+                                                  'affine'],
+                                   output_names = ['target_streamlines'],
+                                   function = sl_filter,
+                                   name = 'filter_streamlines'))
+
+infosource = Node(IdentityInterface(fields=['subject_id',
+                                            'atlas_file', 'region_label']),
+                                    name='infosource')
 infosource.iterables = ('subject_id', sids)
+infosource.iterables = ('region_label', atlas_labels)
+infosource.inputs.atlas_file = atlas_file
 
-tracker = Node(Function(input_names=['sid', 'data_dir', 'out_dir', 'resamp',
+tracker = Node(Function(input_names=['sid', 'data_dir', 'out_dir', 'resolution',
                                      'recon', 'num_threads'],
                         output_names=['tensor_fa_file', 'tensor_evec_file',
                                       'model_gfa_file',
-                                      'model_track_file'],
+                                      'model_track_file',
+                                      'affine'],
                         function=dmri_recon), name='tracker')
 tracker.inputs.data_dir = data_dir
 tracker.inputs.out_dir = out_dir
-tracker.inputs.resamp = resamp
+tracker.inputs.resolution = resolution
 tracker.inputs.recon = 'csd'
 num_threads =  10
 tracker.inputs.num_threads = num_threads
@@ -222,6 +267,14 @@ wf = Workflow(name='exvivo')
 
 wf.connect(infosource, 'subject_id', tracker, 'sid')
 #wf.connect(tracker, 'sid', ds, 'container')
+
+# atlas target filtering
+wf.connect(infosource, 'atlas_file', region_extracter, 'atlas_file')
+wf.connect(infosource, 'region_label', region_extracter, 'label')
+
+wf.connect(tracker, 'model_track_file', filter_streamlines, 'streamlines')
+wf.connect(region_extracter, 'single_region', filter_streamlines, 'target_mask')
+wf.connect(tracker, 'affine', filter_streamlines, 'affine')
 
 wf.connect(tracker, 'tensor_fa_file', ds, 'recon.@fa')
 wf.connect(tracker, 'tensor_evec_file', ds, 'recon.@evec')
