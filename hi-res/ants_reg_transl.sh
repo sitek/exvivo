@@ -3,13 +3,12 @@
 # from ants github wiki
 # https://github.com/stnava/ANTs/wiki/Anatomy-of-an-antsRegistration-call
 
-#SBATCH --qos=gablab
-#SBATCH --time=3:00:00
-#SBATCH --mem=50G
+#SBATCH --time=12:00:00
+#SBATCH --mem=140G
 
-moving_img=/om/user/ksitek/exvivo/data/S64520_m0_200um.nii.gz
-fixed_img=/om/user/ksitek/exvivo/data/Reg_S64550_nii_b0-slice_fslreorient2std.nii.gz
-out_template=/om/user/ksitek/exvivo/data/Reg_S64520_200um_to_S64550_ants_Similarity_Affine_MI_16x8x4x2
+moving_img=/om2/user/ksitek/exvivo/data/Reg_S64550_nii_b0-slice_fslreorient2std.nii.gz
+fixed_img=/om2/user/ksitek/exvivo/data/S64520_m0_SLA.nii.gz
+out_template=/om2/user/ksitek/exvivo/data/diff2anatSLA_ants_Similarity_Affine_MI_16x8x4x2
 
 antsRegistration --dimensionality 3 --float 0 \
         --output [$out_template, ${out_template}Warped.nii.gz] \
