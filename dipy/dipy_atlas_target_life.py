@@ -1,3 +1,9 @@
+'''
+After creating tractography streamlines with dipy_csd.py,
+this workflow takes an atlas file and finds connections
+between each region in the atlas
+KRS 2018.05.04
+'''
 from nipype import config
 config.set('execution', 'remove_unnecessary_outputs', 'false')
 config.set('execution', 'crashfile_format', 'txt')
@@ -10,6 +16,7 @@ from nipype.interfaces.io import SelectFiles, DataSink
 import os
 from glob import glob
 
+# which data sampling? also used for naming
 resolution = '1.0mm'
 out_prefix = 'fathresh-0.1'
 
@@ -124,10 +131,11 @@ fa_img = nib.load(fa_file)
 affine = fa_img.affine
 filter_streamlines.inputs.affine = affine
 
-# filter streamlines AGAIN - for each seed, also filter for each target
+# filter streamlines AGAIN - did it for each seed, also filter for each target
 iden_target = Node(IdentityInterface(fields=['target_label']), name="identity_target")
 iden_target.iterables = [("target_label", atlas_labels)]
 
+# extract target ROI
 def extract_region_target(atlas_file, label):
     from nipype.interfaces.base import CommandLine
     from nipype.pipeline.engine import Node
@@ -152,6 +160,7 @@ region_extracter_target = Node(Function(input_names = ['atlas_file','label'],
                                  name = 'region_extracter_target')
 region_extracter_target.config = {'execution': {'keep_unnecessary_outputs': 'true'}}
 
+# filter streamlines by target ROI (for each seed ROI)
 def sl_filter_target(streamlines, target_mask, affine, seed_label, target_label):
     from dipy.tracking.utils import target
     from nilearn.image import resample_img
@@ -189,7 +198,7 @@ filter_streamlines_target = Node(Function(input_names = ['streamlines', 'target_
                                    name = 'filter_streamlines_target')
 filter_streamlines_target.inputs.affine = affine
 
-# linear fascicle evaluation
+# reduce unlikely streamlines with linear fascicle evaluation
 def life(streamline_file, data_file, bvals, bvecs, seed_label, target_label):
     import numpy as np
     import nibabel as nib
@@ -229,6 +238,7 @@ life.inputs.data_file = fimg
 life.inputs.bvals = fbval
 life.inputs.bvecs = fbvec
 
+# define inputs to the workflow
 infosource = Node(IdentityInterface(fields=['subject_id',
                                             'atlas_file',
                                             ]),
@@ -236,10 +246,12 @@ infosource = Node(IdentityInterface(fields=['subject_id',
 infosource.inputs.subject_id = sids[0]
 infosource.inputs.atlas_file = atlas_file
 
+# create the output data sink
 ds = Node(DataSink(parameterization=False), name='sinker')
 ds.inputs.base_directory = out_dir
 ds.plugin_args = {'overwrite': True}
 
+# create the nipype workflow and connect nodes' inputs/outputs
 wf = Workflow(name='exvivo')
 wf.config['execution']['crashfile_format'] = 'txt'
 
@@ -262,11 +274,10 @@ wf.connect(filter_streamlines_target, 'target_streamlines', life, 'streamline_fi
 wf.connect(filter_streamlines_target, 'seed_label', life, 'seed_label')
 wf.connect(filter_streamlines_target, 'target_label', life, 'target_label')
 
-# data sink
+# output data to the data sink
 wf.connect(life, 'streamline_file', ds, 'target_streamlines')
 wf.connect(life, 'life_trk', ds, 'life')
 
+# definte the working directory and run the workflow
 wf.base_dir = work_dir
-
-#wf.run(plugin='SLURM', plugin_args={'sbatch_args': '--time=3-00:00:00 --qos=gablab --mem=80G -N1 -c2'})
 wf.run(plugin='MultiProc')
