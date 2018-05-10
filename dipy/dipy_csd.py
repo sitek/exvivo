@@ -1,29 +1,28 @@
-#from nipype import config
+from nipype import config
+config.set('execution', 'remove_unnecessary_outputs', 'false')
+config.set('execution', 'crashfile_format', 'txt')
+
 #config.enable_provenance()
-#
+
 from nipype import Node, Function, Workflow, IdentityInterface
 from nipype.interfaces.io import SelectFiles, DataSink
 
 import os
 from glob import glob
 
-resolution = '0.8mm'
+resolution = '1.0mm'
+out_prefix = 'fathresh-0.1'
 
-data_dir = '/om/user/ksitek/exvivo/data'
-out_dir = '/om/user/ksitek/exvivo/analysis/dipy_csd/%s_fa_thresh_0.3_ang_thresh_45/'%resolution
+data_dir = '/om2/user/ksitek/exvivo/data'
+out_dir = '/om2/user/ksitek/exvivo/analysis/dipy_csd/%s_%s/'%(out_prefix, resolution)
 sids = ['Reg_S64550']
 
 if not os.path.exists(out_dir):
     os.mkdir(out_dir)
 
-work_dir = os.path.abspath('/om/scratch/Thu/ksitek/dipy_csd/%s'%resolution)
+work_dir = os.path.abspath('/om2/scratch/ksitek/dipy_csd/%s_%s/'%(out_prefix, resolution))
 
-# if you want to run tractography from specific regions of interest
-atlas_file = os.path.join('/om/user/ksitek/exvivo/maastricht/',
-                          'atlas/maas-atlas2exvivo_ants_Linear.nii.gz')
-atlas_labels = [x+1 for x in range(8)] # labels 1-8
-
-def dmri_recon(sid, data_dir, out_dir, resolution, recon='csd', num_threads=1):
+def dmri_recon(sid, data_dir, out_dir, resolution, recon='csd', num_threads=2):
     import tempfile
     #tempfile.tempdir = '/om/scratch/Fri/ksitek/'
 
@@ -40,18 +39,19 @@ def dmri_recon(sid, data_dir, out_dir, resolution, recon='csd', num_threads=1):
     import numpy as np
     from glob import glob
 
-    if resolution = '0.2mm':
-        filename = 'Reg_S64550_nii4d.nii.gz'
+    if resolution == '0.2mm':
+        filename = 'Reg_S64550_nii4d.nii'
+        fimg = os.path.abspath(glob(os.path.join(data_dir, filename))[0])
     else:
         filename = 'Reg_S64550_nii4d_resamp-%s.nii.gz'%(resolution)
-    fimg = os.path.abspath(glob(os.path.join(data_dir, 'resample', filename))[0])
-    print "dwi file = %s"%fimg
+        fimg = os.path.abspath(glob(os.path.join(data_dir, 'resample', filename))[0])
+    print("dwi file = %s"%fimg)
     fbvec = os.path.abspath(glob(os.path.join(data_dir, 'bvecs',
                                               'camino_120_RAS_flipped-xy.bvecs'))[0])
-    print "bvec file = %s"%fbvec
+    print("bvec file = %s"%fbvec)
     fbval = os.path.abspath(glob(os.path.join(data_dir, 'bvecs',
                                               'camino_120_RAS.bvals'))[0])
-    print "bval file = %s"%fbval
+    print("bval file = %s"%fbval)
     img = nib.load(fimg)
     data = img.get_data()
 
@@ -62,10 +62,6 @@ def dmri_recon(sid, data_dir, out_dir, resolution, recon='csd', num_threads=1):
     from dipy.io import read_bvals_bvecs
     from dipy.core.gradients import vector_norm
     bvals, bvecs = read_bvals_bvecs(fbval, fbvec)
-    print "bvals.shape:"
-    print bvals.shape
-    print "bvecs.shape:"
-    print bvecs.shape
 
     b0idx = []
     for idx, val in enumerate(bvals):
@@ -74,45 +70,39 @@ def dmri_recon(sid, data_dir, out_dir, resolution, recon='csd', num_threads=1):
             #bvecs[idx] = [1, 0, 0]
         else:
             b0idx.append(idx)
-            print "b0idx=%d"%idx
-    print "input bvecs:"
-    print bvecs
+            #print "b0idx=%d"%idx
+    #print "input bvecs:"
+    #print bvecs
     bvecs[b0idx, :] = bvecs[b0idx, :]/vector_norm(bvecs[b0idx])[:, None]
-    print "bvecs after normalization:"
-    print bvecs
+    #print "bvecs after normalization:"
+    #print bvecs
 
 
     from dipy.core.gradients import gradient_table
     gtab = gradient_table(bvals, bvecs)
-    print "bvecs shape?"
     gtab.bvecs.shape == bvecs.shape
     gtab.bvecs
-    print "bvals shape?"
     gtab.bvals.shape == bvals.shape
     gtab.bvals
 
 
     from dipy.reconst.csdeconv import auto_response
-    response, ratio = auto_response(gtab, data, roi_radius=10, fa_thr=0.3) # 0.7
-    print "response:"
-    print response
-    print "ratio:"
-    print ratio
+    response, ratio = auto_response(gtab, data, roi_radius=10, fa_thr=0.1) # 0.7
 
     #from dipy.segment.mask import median_otsu
     #b0_mask, mask = median_otsu(data[:, :, :, b0idx].mean(axis=3).squeeze(), 4, 4)
 
-    if resolution = '0.2mm':
+    if resolution == '0.2mm':
         mask_name = 'Reg_S64550_nii_b0-slice_mask.nii.gz'
         fmask1 = os.path.join(data_dir, mask_name)
     else:
         mask_name = 'Reg_S64550_nii_b0-slice_mask_resamp-%s.nii.gz'%(resolution)
         fmask1 = os.path.join(data_dir, 'resample', mask_name)
-    print "fmask file = %s"%fmask1
+    print("fmask file = %s"%fmask1)
     mask = nib.load(fmask1).get_data()
 
     useFA = True
-    print "creating model"
+    print("creating model")
     if recon == 'csd':
         from dipy.reconst.csdeconv import ConstrainedSphericalDeconvModel
         model = ConstrainedSphericalDeconvModel(gtab, response)
@@ -126,14 +116,14 @@ def dmri_recon(sid, data_dir, out_dir, resolution, recon='csd', num_threads=1):
         from dipy.reconst.dsi import (DiffusionSpectrumDeconvModel,
                                       DiffusionSpectrumModel)
         model = DiffusionSpectrumDeconvModel(gtab)
-    #fit = model.fit(data)
+    fit = model.fit(data)
 
     from dipy.data import get_sphere
     sphere = get_sphere('symmetric724')
     #odfs = fit.odf(sphere)
 
     from dipy.reconst.peaks import peaks_from_model
-    print "running peaks_from_model"
+    print("running peaks_from_model")
     peaks = peaks_from_model(model=model,
                              data=data,
                              sphere=sphere,
@@ -148,22 +138,50 @@ def dmri_recon(sid, data_dir, out_dir, resolution, recon='csd', num_threads=1):
                              nbr_processes=num_threads)
 
     from dipy.reconst.dti import TensorModel
-    print "running tensor model"
+    print("running tensor model")
     tenmodel = TensorModel(gtab)
     tenfit = tenmodel.fit(data, mask)
 
     from dipy.reconst.dti import fractional_anisotropy
-    print "running FA"
+    print("running FA")
     FA = fractional_anisotropy(tenfit.evals)
     FA[np.isnan(FA)] = 0
     fa_img = nib.Nifti1Image(FA, img.get_affine())
     tensor_fa_file = os.path.abspath('%s_tensor_fa.nii.gz' % (prefix))
     nib.save(fa_img, tensor_fa_file)
 
+    from dipy.reconst.dti import axial_diffusivity
+    print("running AD")
+    AD = axial_diffusivity(tenfit.evals)
+    AD[np.isnan(AD)] = 0
+    ad_img = nib.Nifti1Image(AD, img.get_affine())
+    tensor_ad_file = os.path.abspath('%s_tensor_ad.nii.gz' % (prefix))
+    nib.save(ad_img, tensor_ad_file)
+
+    from dipy.reconst.dti import radial_diffusivity
+    print("running RD")
+    RD = radial_diffusivity(tenfit.evals)
+    RD[np.isnan(RD)] = 0
+    rd_img = nib.Nifti1Image(RD, img.get_affine())
+    tensor_rd_file = os.path.abspath('%s_tensor_rd.nii.gz' % (prefix))
+    nib.save(rd_img, tensor_rd_file)
+
+    from dipy.reconst.dti import mean_diffusivity
+    print("running MD")
+    MD = mean_diffusivity(tenfit.evals)
+    MD[np.isnan(MD)] = 0
+    md_img = nib.Nifti1Image(MD, img.get_affine())
+    tensor_md_file = os.path.abspath('%s_tensor_md.nii.gz' % (prefix))
+    nib.save(md_img, tensor_md_file)
+
     evecs = tenfit.evecs
     evec_img = nib.Nifti1Image(evecs, img.get_affine())
     tensor_evec_file = os.path.abspath('%s_tensor_evec.nii.gz' % (prefix))
     nib.save(evec_img, tensor_evec_file)
+
+    shm_coeff = fit.shm_coeff
+    shm_coeff_file = os.path.abspath('%s_shm_coeff.nii.gz' % (prefix))
+    nib.save(nib.Nifti1Image(shm_coeff, img.get_affine()), shm_coeff_file)
 
     #from dipy.reconst.dti import quantize_evecs
     #peak_indices = quantize_evecs(tenfit.evecs, sphere.vertices)
@@ -175,7 +193,7 @@ def dmri_recon(sid, data_dir, out_dir, resolution, recon='csd', num_threads=1):
     nib.save(fa_img, model_gfa_file)
 
     from dipy.tracking.eudx import EuDX
-    print "reconstructing with EuDX"
+    print("reconstructing with EuDX")
     if useFA:
         eu = EuDX(FA, peaks.peak_indices[..., 0],
                   odf_vertices = sphere.vertices,
@@ -189,17 +207,38 @@ def dmri_recon(sid, data_dir, out_dir, resolution, recon='csd', num_threads=1):
                   seeds=10**6,
                   ang_thr=45)
 
+    sl_fname = os.path.abspath('%s_%s_streamline.trk' % (prefix, recon))
+    """
     #import dipy.tracking.metrics as dmetrics
     streamlines = ((sl, None, None) for sl in eu) # if dmetrics.length(sl) > 15)
 
     hdr = nib.trackvis.empty_header()
     hdr['voxel_size'] = fa_img.get_header().get_zooms()[:3]
-    hdr['voxel_order'] = 'LAS'
+    hdr['voxel_order'] = 'RAS' #LAS
     hdr['dim'] = FA.shape[:3]
 
-    sl_fname = os.path.abspath('%s_%s_streamline.trk' % (prefix, recon))
-
     nib.trackvis.write(sl_fname, streamlines, hdr, points_space='voxel')
+    """
+    # trying new dipy.io.streamline module, per email to neuroimaging list
+    # 2018.04.05
+    from nibabel.streamlines import Field
+    from nibabel.orientations import aff2axcodes
+    affine = img.get_affine()
+    vox_size=fa_img.get_header().get_zooms()[:3]
+    fov_shape=FA.shape[:3]
+
+    if vox_size is not None and fov_shape is not None:
+        hdr = {}
+        hdr[Field.VOXEL_TO_RASMM] = affine.copy()
+        hdr[Field.VOXEL_SIZES] = vox_size
+        hdr[Field.DIMENSIONS] = fov_shape
+        hdr[Field.VOXEL_ORDER] = "".join(aff2axcodes(affine))
+
+    tractogram = nib.streamlines.Tractogram(eu)
+    tractogram.affine_to_rasmm = affine
+    trk_file = nib.streamlines.TrkFile(tractogram, header=hdr)
+    nib.streamlines.save(trk_file, sl_fname)
+
     if oldval:
         os.environ['MKL_NUM_THREADS'] = oldval
     else:
@@ -208,85 +247,66 @@ def dmri_recon(sid, data_dir, out_dir, resolution, recon='csd', num_threads=1):
         os.environ['OMP_NUM_THREADS'] = ompoldval
     else:
         del os.environ['OMP_NUM_THREADS']
-    return tensor_fa_file, tensor_evec_file, model_gfa_file, sl_fname, affine
 
-# extract targets from an atlas file
-# see nilearn example 8.5.4. Regions Extraction of Default Mode Networks using Smith Atlas
-def extract_region(atlas_file, label):
-    from nipype.interfaces.base import CommandLine
-    from nipype.pipeline.engine import Node
-    node = Node(CommandLine('fslmaths %s -thr %s -uthr %s region_%s.nii.gz'%(atlas_file, label, label, label)),
-                name = 'extract_roi')
-    node.base_dir = os.getcwd()
-    node.run()
+    assert tensor_fa_file
+    assert tensor_evec_file
+    assert model_gfa_file
+    assert tensor_ad_file
+    assert tensor_rd_file
+    assert tensor_md_file
+    assert shm_coeff_file
+    print('all output files created')
 
-    return single_region
+    return tensor_fa_file, tensor_evec_file, model_gfa_file, sl_fname, affine, tensor_ad_file, tensor_rd_file, tensor_md_file, shm_coeff_file
 
-region_extracter = Node(Function(input_names = ['atlas_file','label'],
-                                 output_names = ['single_region'],
-                                 function = extract_region,
-                                 name = 'region_extracter'))
-
-# filter streamlines by region of interest
-def sl_filter(streamlines, target_mask, affine, include=True):
-    from dipy.tracking.utils import target
-
-    target(streamlines, target_mask, affine, include=True)
-
-    return target_streamlines
-
-filter_streamlines = Node(Function(input_names = ['streamlines', 'target_mask',
-                                                  'affine'],
-                                   output_names = ['target_streamlines'],
-                                   function = sl_filter,
-                                   name = 'filter_streamlines'))
-
-infosource = Node(IdentityInterface(fields=['subject_id',
-                                            'atlas_file', 'region_label']),
+infosource = Node(IdentityInterface(fields=['subject_id'),
                                     name='infosource')
-infosource.iterables = ('subject_id', sids)
-infosource.iterables = ('region_label', atlas_labels)
-infosource.inputs.atlas_file = atlas_file
+#infosource.iterables = ('subject_id', sids)
+infosource.inputs.subject_id = sids[0]
 
 tracker = Node(Function(input_names=['sid', 'data_dir', 'out_dir', 'resolution',
                                      'recon', 'num_threads'],
-                        output_names=['tensor_fa_file', 'tensor_evec_file',
+                        output_names=['tensor_fa_file',
+                                      'tensor_evec_file',
                                       'model_gfa_file',
                                       'model_track_file',
-                                      'affine'],
+                                      'affine',
+                                      'tensor_ad_file',
+                                      'tensor_rd_file',
+                                      'tensor_md_file',
+                                      'shm_coeff_file'],
                         function=dmri_recon), name='tracker')
 tracker.inputs.data_dir = data_dir
 tracker.inputs.out_dir = out_dir
 tracker.inputs.resolution = resolution
 tracker.inputs.recon = 'csd'
-num_threads =  10
+num_threads =  12
 tracker.inputs.num_threads = num_threads
-tracker.plugin_args = {'sbatch_args': '--qos=gablab --time=2-00:00:00 --mem=%dG -N 1 -c %d' % (20 * num_threads, num_threads),
-                       'overwrite': True}
+#tracker.plugin_args = {'sbatch_args': '--time=1-00:00:00 --mem=%dG -N 1 -c %d' % (10 * num_threads, num_threads),
+#                       'overwrite': True}
 
 ds = Node(DataSink(parameterization=False), name='sinker')
 ds.inputs.base_directory = out_dir
 ds.plugin_args = {'overwrite': True}
 
 wf = Workflow(name='exvivo')
+wf.config['execution']['crashfile_format'] = 'txt'
 
 wf.connect(infosource, 'subject_id', tracker, 'sid')
 #wf.connect(tracker, 'sid', ds, 'container')
 
-# atlas target filtering
-wf.connect(infosource, 'atlas_file', region_extracter, 'atlas_file')
-wf.connect(infosource, 'region_label', region_extracter, 'label')
-
-wf.connect(tracker, 'model_track_file', filter_streamlines, 'streamlines')
-wf.connect(region_extracter, 'single_region', filter_streamlines, 'target_mask')
-wf.connect(tracker, 'affine', filter_streamlines, 'affine')
-
+# data sink
 wf.connect(tracker, 'tensor_fa_file', ds, 'recon.@fa')
 wf.connect(tracker, 'tensor_evec_file', ds, 'recon.@evec')
 wf.connect(tracker, 'model_gfa_file', ds, 'recon.@gfa')
 wf.connect(tracker, 'model_track_file', ds, 'recon.@track')
 
+wf.connect(tracker, 'tensor_ad_file', ds, 'recon.@ad')
+wf.connect(tracker, 'tensor_rd_file', ds, 'recon.@rd')
+wf.connect(tracker, 'tensor_md_file', ds, 'recon.@md')
+wf.connect(tracker, 'shm_coeff_file', ds, 'recon.@shm_coeff')
+
 wf.base_dir = work_dir
 
-wf.run(plugin='SLURM',
-       plugin_args={'sbatch_args': '--time=3-00:00:00 --mem=80G -N1 -c2 --qos=gablab'})
+#wf.run(plugin='SLURM', plugin_args={'sbatch_args': '--time=3-00:00:00 --qos=gablab --mem=80G -N1 -c2'})
+wf.run(plugin='MultiProc')
